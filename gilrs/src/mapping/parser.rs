@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::ev::{Axis, AxisOrBtn, Button};
 
 // Must be sorted!
-static AXES_SDL: [&str; 32] = [
+static AXES_SDL: [&str; 35] = [
     "a",
     "b",
     "back",
@@ -30,6 +30,9 @@ static AXES_SDL: [&str; 32] = [
     "leftz",
     "misc1",
     "misc2",
+    "misc3",
+    "misc4",
+    "misc5",
     "paddle1",
     "paddle2",
     "paddle3",
@@ -46,7 +49,7 @@ static AXES_SDL: [&str; 32] = [
     "y",
     "z",
 ];
-static AXES: [AxisOrBtn; 32] = [
+static AXES: [AxisOrBtn; 35] = [
     AxisOrBtn::Btn(Button::South),
     AxisOrBtn::Btn(Button::East),
     AxisOrBtn::Btn(Button::Select),
@@ -62,6 +65,9 @@ static AXES: [AxisOrBtn; 32] = [
     AxisOrBtn::Axis(Axis::LeftStickX),
     AxisOrBtn::Axis(Axis::LeftStickY),
     AxisOrBtn::Axis(Axis::LeftZ),
+    AxisOrBtn::Btn(Button::Unknown),
+    AxisOrBtn::Btn(Button::Unknown),
+    AxisOrBtn::Btn(Button::Unknown),
     AxisOrBtn::Btn(Button::Unknown),
     AxisOrBtn::Btn(Button::Unknown),
     AxisOrBtn::Btn(Button::Unknown),
@@ -385,11 +391,8 @@ mod tests {
 
     #[test]
     fn test_all_sdl_mappings_for_parse_errors() {
-        let included_mappings = include_str!(concat!(
-            env!("OUT_DIR"),
-            "/gamecontrollerdb.txt"
-        ))
-        .lines();
+        let included_mappings =
+            include_str!(concat!(env!("OUT_DIR"), "/gamecontrollerdb.txt")).lines();
 
         let mut errors = 0;
         let mut index = 0;
