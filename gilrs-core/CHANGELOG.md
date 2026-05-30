@@ -1,6 +1,15 @@
 Change Log
 ==========
 
+v0.6.8 - 2026-05-30
+----------
+
+### Changed
+
+- MSRV is now 1.84
+- windows: Propagate more errors to prevent panics on wine
+- linux: Update nix to 0.31
+
 v0.6.7 - 2026-01-11
 ----------
 
