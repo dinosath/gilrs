@@ -3,6 +3,15 @@ Change Log
 
 See also [gilrs-core changelog](../gilrs-core/CHANGELOG.md).
 
+v0.11.2 - 2026-05-30
+----------
+
+### Changed
+
+- MSRV is now 1.84
+- Updated bundled mappings
+- Always use forward slash in `include/include_str!`
+
 v0.11.1 - 2026-01-11
 ----------
 
