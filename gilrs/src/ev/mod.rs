@@ -265,3 +265,15 @@ impl AxisOrBtn {
         matches!(self, AxisOrBtn::Btn(_))
     }
 }
+
+impl From<Axis> for AxisOrBtn {
+    fn from(value: Axis) -> Self {
+        Self::Axis(value)
+    }
+}
+
+impl From<Button> for AxisOrBtn {
+    fn from(value: Button) -> Self {
+        Self::Btn(value)
+    }
+}
