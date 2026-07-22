@@ -1111,12 +1111,12 @@ impl GamepadData {
 
     /// Returns `Code` associated with `btn`.
     pub fn button_code(&self, btn: Button) -> Option<Code> {
-        self.mapping.map_rev(&AxisOrBtn::Btn(btn)).map(Code)
+        self.mapping.map_rev(&btn.into()).map(Code)
     }
 
     /// Returns `Code` associated with `axis`.
     pub fn axis_code(&self, axis: Axis) -> Option<Code> {
-        self.mapping.map_rev(&AxisOrBtn::Axis(axis)).map(Code)
+        self.mapping.map_rev(&axis.into()).map(Code)
     }
 }
 
