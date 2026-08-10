@@ -457,7 +457,9 @@ struct DeviceInfo {
     entry_id: u64,
     location_id: u32,
     is_connected: bool,
+    last_hat_values: [i32; 2],
 }
+
 #[cfg(feature = "serde-serialize")]
 use serde::{Deserialize, Serialize};
 
@@ -694,6 +696,7 @@ extern "C-unwind" fn device_matching_cb(
                 entry_id,
                 location_id,
                 is_connected: true,
+                last_hat_values: [0; 2],
             });
 
             device_infos.len() - 1
@@ -777,7 +780,7 @@ unsafe extern "C-unwind" fn input_value_cb(
         }
     };
 
-    let device_infos = device_infos.lock().unwrap();
+    let mut device_infos = device_infos.lock().unwrap();
     let id = match device_infos
         .iter()
         .position(|info| info.entry_id == entry_id && info.is_connected)
@@ -859,6 +862,42 @@ unsafe extern "C-unwind" fn input_value_cb(
             0 | 1 | 7 => -1, // up
             _ => 0,
         };
+
+        // Send fake neutral axis events to ensure that `axis_dpad_to_button` filtering
+        // catches that we are releasing one dpad value. Also good practice to indicate that
+        // a "button" has been released here
+        let last_hat = device_infos[id].last_hat_values;
+        if last_hat[0] != 0 && last_hat[0] == -x_axis_value {
+            let fake_event = Event::new(
+                id,
+                EventType::AxisValueChanged(
+                    0,
+                    crate::EvCode(EvCode {
+                        page,
+                        usage: USAGE_AXIS_DPADX,
+                    }),
+                ),
+            );
+
+            let _ = tx.send((fake_event, None));
+        }
+
+        if last_hat[1] != 0 && last_hat[1] == -y_axis_value {
+            let fake_event = Event::new(
+                id,
+                EventType::AxisValueChanged(
+                    0,
+                    crate::EvCode(EvCode {
+                        page,
+                        usage: USAGE_AXIS_DPADY,
+                    }),
+                ),
+            );
+
+            let _ = tx.send((fake_event, None));
+        }
+
+        device_infos[id].last_hat_values = [x_axis_value, y_axis_value];
 
         let x_axis_event = Event::new(
             id,
