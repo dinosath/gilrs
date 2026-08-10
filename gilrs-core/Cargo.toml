@@ -29,6 +29,7 @@ vec_map = "0.8"
 inotify = { version = "0.11.0", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = [
     "std",
     "CFArray",
@@ -53,6 +54,7 @@ windows = { version = ">=0.44, <=0.62", optional = true, features = [
     "Devices_Power",
     "System_Power",
     "Gaming_Input_ForceFeedback",
+    "Win32_System_WindowsProgramming",
 ] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

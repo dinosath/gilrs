@@ -147,6 +147,7 @@ pub fn deadzone(ev: Option<Event>, gilrs: &mut Gilrs) -> Option<Event> {
             event: EventType::AxisChanged(axis, val, nec),
             id,
             time,
+            monotonic_ns,
         }) => {
             let threshold = match gilrs.gamepad(id).deadzone(nec) {
                 Some(t) => t,
@@ -173,6 +174,7 @@ pub fn deadzone(ev: Option<Event>, gilrs: &mut Gilrs) -> Option<Event> {
                         id,
                         time,
                         event: EventType::AxisChanged(other_axis, 0., other_code),
+                        monotonic_ns,
                     });
                     gilrs.gamepads_data[id.0].have_sent_nonzero_for_axis[other_axis_idx] = false;
                 }
@@ -188,6 +190,7 @@ pub fn deadzone(ev: Option<Event>, gilrs: &mut Gilrs) -> Option<Event> {
                         id,
                         time,
                         event: EventType::AxisChanged(axis, val.0, nec),
+                        monotonic_ns,
                     }
                 })
             } else {
@@ -203,6 +206,7 @@ pub fn deadzone(ev: Option<Event>, gilrs: &mut Gilrs) -> Option<Event> {
                         id,
                         time,
                         event: EventType::AxisChanged(axis, val, nec),
+                        monotonic_ns,
                     }
                 })
             }
@@ -211,6 +215,7 @@ pub fn deadzone(ev: Option<Event>, gilrs: &mut Gilrs) -> Option<Event> {
             event: EventType::ButtonChanged(btn, val, nec),
             id,
             time,
+            monotonic_ns,
         }) => {
             let gp = &gilrs.gamepad(id);
             let threshold = match gp.deadzone(nec) {
@@ -226,6 +231,7 @@ pub fn deadzone(ev: Option<Event>, gilrs: &mut Gilrs) -> Option<Event> {
                     id,
                     time,
                     event: EventType::ButtonChanged(btn, val, nec),
+                    monotonic_ns,
                 }
             })
         }
@@ -475,6 +481,7 @@ impl FilterFn for Repeat {
                                     id,
                                     event: EventType::ButtonRepeated(btn_name, nec),
                                     time: btn_data.timestamp() + self.after,
+                                    monotonic_ns: utils::monotonic_now_ns(),
                                 });
                             }
                             (true, true, Ok(dur)) if dur >= self.every => {
@@ -487,6 +494,7 @@ impl FilterFn for Repeat {
                                     id,
                                     event: EventType::ButtonRepeated(btn_name, nec),
                                     time: btn_data.timestamp() + self.every,
+                                    monotonic_ns: utils::monotonic_now_ns(),
                                 });
                             }
                             _ => (),

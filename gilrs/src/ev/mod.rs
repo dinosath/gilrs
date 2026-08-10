@@ -57,6 +57,12 @@ pub struct Event {
     pub event: EventType,
     /// Time when event was emitted.
     pub time: SystemTime,
+    /// Monotonic timestamp in nanoseconds when event was emitted.
+    ///
+    /// This is derived from the system's monotonic clock and is useful for
+    /// measuring the duration between events or using as a reference time
+    /// for other monotonically stamped events.
+    pub monotonic_ns: u64,
 }
 
 impl Event {
@@ -66,6 +72,7 @@ impl Event {
             id,
             event,
             time: utils::time_now(),
+            monotonic_ns: utils::monotonic_now_ns(),
         }
     }
 

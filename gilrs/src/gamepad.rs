@@ -231,6 +231,7 @@ impl Gilrs {
                     id,
                     event: event_type,
                     time,
+                    monotonic_ns,
                     ..
                 }) => {
                     trace!("Original event: {:?}", event);
@@ -245,6 +246,7 @@ impl Gilrs {
                                         id,
                                         time,
                                         event: EventType::ButtonChanged(b, 1.0, nec),
+                                        monotonic_ns,
                                     });
 
                                     EventType::ButtonPressed(b, nec)
@@ -255,6 +257,7 @@ impl Gilrs {
                                         id,
                                         time,
                                         event: EventType::ButtonChanged(Button::Unknown, 1.0, nec),
+                                        monotonic_ns,
                                     });
 
                                     EventType::ButtonPressed(Button::Unknown, nec)
@@ -269,6 +272,7 @@ impl Gilrs {
                                         id,
                                         time,
                                         event: EventType::ButtonChanged(b, 0.0, nec),
+                                        monotonic_ns,
                                     });
 
                                     EventType::ButtonReleased(b, nec)
@@ -279,6 +283,7 @@ impl Gilrs {
                                         id,
                                         time,
                                         event: EventType::ButtonChanged(Button::Unknown, 0.0, nec),
+                                        monotonic_ns,
                                     });
 
                                     EventType::ButtonReleased(Button::Unknown, nec)
@@ -301,6 +306,7 @@ impl Gilrs {
                                             id,
                                             time,
                                             event: EventType::ButtonChanged(b, val, nec),
+                                            monotonic_ns,
                                         });
 
                                         EventType::ButtonPressed(b, nec)
@@ -311,6 +317,7 @@ impl Gilrs {
                                             id,
                                             time,
                                             event: EventType::ButtonChanged(b, val, nec),
+                                            monotonic_ns,
                                         });
 
                                         EventType::ButtonReleased(b, nec)
@@ -368,7 +375,12 @@ impl Gilrs {
                         }
                     };
 
-                    Some(Event { id, event, time })
+                    Some(Event {
+                        id,
+                        event,
+                        time,
+                        monotonic_ns,
+                    })
                 }
                 None => None,
             }
