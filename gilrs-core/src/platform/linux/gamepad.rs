@@ -513,7 +513,31 @@ impl AxesInfo {
                 abs_bits.as_mut_ptr(),
             );
 
-            for axis in Gamepad::find_axes(&abs_bits) {
+            for axis in Gamepad::find_axes(&abs_bits, EV_ABS) {
+                let mut info = input_absinfo::default();
+                ioctl::eviocgabs(fd, u32::from(axis.code), &mut info);
+                map.insert(
+                    axis.code as usize,
+                    AxisInfo {
+                        min: info.minimum,
+                        max: info.maximum,
+                        deadzone: Some(info.flat as u32),
+                    },
+                );
+            }
+        }
+
+        // FVD XXX use a for loop
+        unsafe {
+            let mut rel_bits = [0u8; (REL_MAX / 8) as usize + 1];
+            ioctl::eviocgbit(
+                fd,
+                u32::from(EV_REL),
+                rel_bits.len() as i32,
+                rel_bits.as_mut_ptr(),
+            );
+
+            for axis in Gamepad::find_axes(&rel_bits, EV_REL) {
                 let mut info = input_absinfo::default();
                 ioctl::eviocgabs(fd, u32::from(axis.code), &mut info);
                 map.insert(
@@ -652,6 +676,8 @@ impl Gamepad {
     }
 
     fn collect_axes_and_buttons(&mut self) {
+        // FVD
+        // XXX TODO: REL axes too
         let mut key_bits = [0u8; (KEY_MAX / 8) as usize + 1];
         let mut abs_bits = [0u8; (ABS_MAX / 8) as usize + 1];
 
@@ -671,7 +697,7 @@ impl Gamepad {
         }
 
         self.buttons = Self::find_buttons(&key_bits, false);
-        self.axes = Self::find_axes(&abs_bits);
+        self.axes = Self::find_axes(&abs_bits, EV_ABS);
     }
 
     fn get_name(fd: i32) -> Option<String> {
@@ -755,17 +781,31 @@ impl Gamepad {
         buttons
     }
 
-    fn find_axes(abs_bits: &[u8]) -> Vec<EvCode> {
+    fn find_axes(abs_bits: &[u8], kind: u16) -> Vec<EvCode> {
         let mut axes = Vec::with_capacity(8);
 
         for bit in 0..(abs_bits.len() * 8) {
             if utils::test_bit(bit as u16, abs_bits) {
-                axes.push(EvCode::new(EV_ABS, bit as u16));
+                axes.push(EvCode::new(kind, bit as u16));
             }
         }
 
         axes
     }
+    // XXX: should it be merged with abs_axes?
+    /*
+    fn find_rel_axes(rel_bits: &[u8]) -> Vec<EvCode> {
+        let mut axes = Vec::with_capacity(8);
+
+        for bit in 0..(rel_bits.len() * 8) {
+            if utils::test_bit(bit as u16, rel_bits) {
+                axes.push(EvCode::new(EV_REL, bit as u16));
+            }
+        }
+
+        axes
+    }
+    */
 
     fn battery_fd(syspath: &Path) -> (i32, i32) {
         use std::fs::{self};
@@ -818,6 +858,9 @@ impl Gamepad {
                 EV_ABS => {
                     self.axes_values.insert(event.code as usize, event.value);
                     Some(EventType::AxisValueChanged(event.value, event.into()))
+                }
+                EV_REL => {
+                    Some(EventType::RelativeEvent(event.value, event.into()))
                 }
                 _ => {
                     trace!("Skipping event {:?}", event);
@@ -1024,10 +1067,9 @@ impl Gamepad {
     }
 
     pub(crate) fn axis_info(&self, nec: EvCode) -> Option<&AxisInfo> {
-        if nec.kind != EV_ABS {
-            None
-        } else {
-            self.axes_info.info.get(nec.code as usize)
+        match nec.kind {
+            EV_REL | EV_ABS => self.axes_info.info.get(nec.code as usize),
+            _ => None,
         }
     }
 }
@@ -1161,6 +1203,7 @@ const EV_ABS: u16 = 0x03;
 const EV_MSC: u16 = 0x04;
 const EV_SW: u16 = 0x05;
 const ABS_MAX: u16 = 0x3f;
+const REL_MAX: u16 = 0x0f;
 const EV_FF: u16 = 0x15;
 
 const SYN_REPORT: u16 = 0x00;
@@ -1204,6 +1247,18 @@ const ABS_HAT1X: u16 = 0x12;
 const ABS_HAT1Y: u16 = 0x13;
 const ABS_HAT2X: u16 = 0x14;
 const ABS_HAT2Y: u16 = 0x15;
+
+const REL_X: u16 = 0x00;
+const REL_Y: u16 = 0x01;
+const REL_Z: u16 = 0x02;
+const REL_RX: u16 = 0x03;
+const REL_RY: u16 = 0x04;
+const REL_RZ: u16 = 0x05;
+const REL_HWHEEL: u16 = 0x06;
+const REL_DIAL: u16 = 0x07;
+const REL_WHEEL: u16 = 0x08;
+const REL_MISC: u16 = 0x09;
+
 
 const FF_MAX: u16 = FF_GAIN;
 const FF_SQUARE: u16 = 0x58;
@@ -1339,6 +1394,47 @@ pub mod native_ev_codes {
         kind: EV_ABS,
         code: super::ABS_HAT2Y,
     };
+    pub const AXIS_RELX: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_X,
+    };
+    pub const AXIS_RELY: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_Y,
+    };
+    pub const AXIS_RELZ: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_Z,
+    };
+    pub const AXIS_RELRX: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_RX,
+    };
+    pub const AXIS_RELRY: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_RY,
+    };
+    pub const AXIS_RELRZ: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_RZ,
+    };
+    pub const AXIS_RELHWHEEL: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_HWHEEL,
+    };
+    pub const AXIS_RELDIAL: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_DIAL,
+    };
+    pub const AXIS_RELWHEEL: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_WHEEL,
+    };
+    pub const AXIS_RELMISC: EvCode = EvCode {
+        kind: EV_REL,
+        code: super::REL_MISC,
+    };
+
 }
 
 #[cfg(test)]

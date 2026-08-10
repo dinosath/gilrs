@@ -285,6 +285,51 @@ impl Gilrs {
                                 }
                             }
                         }
+                        RawEventType::RelativeEvent(val, nec) => {
+                            // We got a relative event
+                            // Let's trust at least our backend code
+                            let axis_info = *self.gamepad(id).inner.axis_info(nec).unwrap();
+                            let nec = Code(nec);
+
+                            match self.gamepad(id).axis_or_btn_name(nec) {
+                                Some(AxisOrBtn::Btn(b)) => {
+                                    // Buttons shouldn't really be relative??
+                                    let val = btn_value(&axis_info, val);
+
+                                    if val >= self.axis_to_btn_pressed // FIXME: this var?
+                                        && !self.gamepad(id).state().is_pressed(nec)
+                                    {
+                                        self.events.push_back(Event {
+                                            id,
+                                            time,
+                                            event: EventType::ButtonChanged(b, val, nec),
+                                        });
+
+                                        EventType::ButtonPressed(b, nec)
+                                    } else if val <= self.axis_to_btn_released // FIXME: this var?
+                                        && self.gamepad(id).state().is_pressed(nec)
+                                    {
+                                        self.events.push_back(Event {
+                                            id,
+                                            time,
+                                            event: EventType::ButtonChanged(b, val, nec),
+                                        });
+
+                                        EventType::ButtonReleased(b, nec)
+                                    } else {
+                                        EventType::ButtonChanged(b, val, nec)
+                                    }
+                                }
+                                Some(AxisOrBtn::Axis(a)) => {
+                                    EventType::AxisChanged(a, axis_value(&axis_info, val, a), nec)
+                                }
+                                None => EventType::AxisChanged(
+                                    Axis::Unknown,
+                                    axis_value(&axis_info, val, Axis::Unknown),
+                                    nec,
+                                ),
+                            }
+                        }
                         RawEventType::AxisValueChanged(val, nec) => {
                             // Let's trust at least our backend code
                             let axis_info = *self.gamepad(id).inner.axis_info(nec).unwrap();
