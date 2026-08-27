@@ -5,6 +5,15 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+use super::windows::{
+    Devices::Power::BatteryReport,
+    Foundation::EventHandler,
+    Gaming::Input::{
+        GameControllerSwitchPosition, Gamepad as WgiGamepad, GamepadButtons, GamepadReading,
+        RawGameController,
+    },
+    System::Power::BatteryStatus,
+};
 use super::FfDevice;
 use crate::native_ev_codes as nec;
 use crate::{utils, AxisInfo, Event, EventType, PlatformError, PowerInfo};
@@ -17,14 +26,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime};
 use uuid::Uuid;
-use windows::core::HSTRING;
-use windows::Devices::Power::BatteryReport;
-use windows::Foundation::EventHandler;
-use windows::Gaming::Input::{
-    GameControllerSwitchPosition, Gamepad as WgiGamepad, GamepadButtons, GamepadReading,
-    RawGameController,
-};
-use windows::System::Power::BatteryStatus;
+use windows_core::HSTRING;
 
 const SDL_HARDWARE_BUS_USB: u32 = 0x03;
 // const SDL_HARDWARE_BUS_BLUETOOTH: u32 = 0x05;
@@ -318,7 +320,7 @@ struct RawGamepadReading {
 }
 
 impl RawGamepadReading {
-    fn new(raw_game_controller: &RawGameController) -> windows::core::Result<Self> {
+    fn new(raw_game_controller: &RawGameController) -> windows_core::Result<Self> {
         let axis_count = raw_game_controller.AxisCount()? as usize;
         let button_count = raw_game_controller.ButtonCount()? as usize;
         let switch_count = raw_game_controller.SwitchCount()? as usize;
@@ -336,7 +338,7 @@ impl RawGamepadReading {
         Ok(new)
     }
 
-    fn update(&mut self, raw_game_controller: &RawGameController) -> windows::core::Result<()> {
+    fn update(&mut self, raw_game_controller: &RawGameController) -> windows_core::Result<()> {
         self.time = raw_game_controller.GetCurrentReading(
             &mut self.buttons,
             &mut self.switches,
@@ -377,7 +379,7 @@ impl Reading {
         }
     }
 
-    fn update(&mut self, controller: &RawGameController) -> windows::core::Result<()> {
+    fn update(&mut self, controller: &RawGameController) -> windows_core::Result<()> {
         match self {
             Reading::Raw(raw_reading) => {
                 raw_reading.update(controller)?;
@@ -630,7 +632,7 @@ impl Gamepad {
     }
 
     /// Using this function so we can easily map errors to unknown
-    fn power_info_err(&self) -> windows::core::Result<PowerInfo> {
+    fn power_info_err(&self) -> windows_core::Result<PowerInfo> {
         if !self.raw_game_controller.IsWireless()? {
             return Ok(PowerInfo::Wired);
         }
