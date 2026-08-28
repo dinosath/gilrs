@@ -7,7 +7,7 @@
 
 use crate::ev::Code;
 
-use fnv::FnvHashMap;
+use rustc_hash::FxHashMap;
 
 use std::collections::hash_map;
 use std::iter::Iterator;
@@ -17,16 +17,16 @@ use std::time::SystemTime;
 #[derive(Clone, Debug)]
 pub struct GamepadState {
     // Indexed by EvCode (nec)
-    buttons: FnvHashMap<Code, ButtonData>,
+    buttons: FxHashMap<Code, ButtonData>,
     // Indexed by EvCode (nec)
-    axes: FnvHashMap<Code, AxisData>,
+    axes: FxHashMap<Code, AxisData>,
 }
 
 impl GamepadState {
     pub(crate) fn new() -> Self {
         GamepadState {
-            buttons: FnvHashMap::default(),
-            axes: FnvHashMap::default(),
+            buttons: FxHashMap::default(),
+            axes: FxHashMap::default(),
         }
     }
 
