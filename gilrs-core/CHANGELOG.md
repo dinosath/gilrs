@@ -1,6 +1,14 @@
 Change Log
 ==========
 
+Unreleased
+----------
+
+### Added
+
+- iOS: new backend built on GameController.framework. The macOS backend cannot be reused
+  there because iOS does not expose IOKit HID.
+
 v0.6.8 - 2026-05-30
 ----------
 

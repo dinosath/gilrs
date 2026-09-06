@@ -70,6 +70,7 @@ Supported features
 | Linux/BSD (evdev)|   ✓   |      ✓      |        ✓       |
 | Windows          |   ✓   |      ✓      |        ✓       |
 | OS X             |   ✓   |      ✓      |        ✕       |
+| iOS              |   ✓   |      ✓      |        ✕       |
 | Wasm             |   ✓   |      ✓      |       n/a      |
 | Android          |   ✕   |      ✕      |        ✕       |
 
@@ -99,6 +100,18 @@ the xinput feature.
 
 Note: Some (Older?) devices may still report inputs without a window but this is not the case
 for all devices so if you are writing a terminal based game, use the xinput feature instead.
+
+iOS
+-----
+
+iOS uses GameController.framework rather than the IOKit HID that the macOS backend reads,
+because iOS does not expose IOKit HID. The framework reports the current state of a pad
+instead of a stream of events, so, as on Wasm, events are only generated when you call
+`Gilrs::next_event()`; `next_event_blocking` polls until the timeout.
+
+The framework already names buttons — `buttonA`, `leftShoulder`, `dpad.up` — so no SDL
+mapping is involved and gamepads report a nil UUID, which puts them on the default mapping.
+Only pads offering the `GCExtendedGamepad` profile are reported.
 
 Wasm
 -----

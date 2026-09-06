@@ -29,6 +29,12 @@ mod platform;
 #[path = "macos/mod.rs"]
 mod platform;
 
+// iOS cannot use the macOS backend: that one reads IOKit HID, which is not
+// available there. GameController.framework is, so it has a backend of its own.
+#[cfg(target_os = "ios")]
+#[path = "ios/mod.rs"]
+mod platform;
+
 #[cfg(all(not(feature = "xinput"), not(feature = "wgi")))]
 compile_error!(
     "Windows needs one of the features `gilrs/xinput` or `gilrs/wgi` enabled. \nEither don't use \
@@ -53,6 +59,7 @@ mod platform;
 #[cfg(all(
     not(any(target_os = "linux")),
     not(target_os = "macos"),
+    not(target_os = "ios"),
     not(target_os = "windows"),
     not(target_arch = "wasm32")
 ))]
