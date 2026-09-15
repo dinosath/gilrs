@@ -6,6 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use super::ff::Device as FfDevice;
+use super::flydigi_hid::FlydigiReader;
 use super::ioctl;
 use super::ioctl::{input_absinfo, input_event};
 use super::udev::*;
@@ -281,6 +282,7 @@ impl Gilrs {
                     });
                 }
                 None => {
+                    gamepad.cleanup_vendor(&self.epoll);
                     self.to_check.pop_front();
                     continue;
                 }
@@ -344,6 +346,7 @@ impl Gilrs {
                         if let Err(e) = self.epoll.delete(gamepad_fd) {
                             error!("Failed to remove disconnected gamepad from epoll: {}", e);
                         }
+                        self.gamepads[id].unregister_fd(&self.epoll);
 
                         self.gamepads[id].disconnect();
                         return Some(Event::new(id, EventType::Disconnected));
@@ -556,6 +559,9 @@ pub struct Gamepad {
     events: Vec<input_event>,
     axes: Vec<EvCode>,
     buttons: Vec<EvCode>,
+    /// Vendor HID reader for controllers whose extra buttons are not exposed through
+    /// evdev (currently Flydigi devices). `None` for every other gamepad.
+    vendor: Option<FlydigiReader>,
     is_connected: bool,
 }
 
@@ -615,6 +621,7 @@ impl Gamepad {
             events: Vec::new(),
             axes: Vec::new(),
             buttons: Vec::new(),
+            vendor: None,
             is_connected: true,
         };
 
@@ -632,6 +639,8 @@ impl Gamepad {
             return None;
         }
 
+        gamepad.attach_vendor_reader(syspath);
+
         info!("Gamepad {} ({}) connected.", gamepad.devpath, gamepad.name);
         debug!(
             "Gamepad {}: uuid: {}, ff_supported: {}, axes: {:?}, buttons: {:?}, axes_info: {:?}",
@@ -648,7 +657,31 @@ impl Gamepad {
 
     fn register_fd(&self, epoll: &Epoll, data: u64) -> Result<(), Errno> {
         let fd = unsafe { BorrowedFd::borrow_raw(self.fd) };
-        epoll.add(fd, EpollEvent::new(EpollFlags::EPOLLIN, data))
+        epoll.add(fd, EpollEvent::new(EpollFlags::EPOLLIN, data))?;
+
+        if let Some(vendor) = &self.vendor {
+            super::flydigi_hid::register(vendor, epoll, data)?;
+        }
+
+        Ok(())
+    }
+
+    /// Removes every file descriptor of this gamepad from `epoll`.
+    fn unregister_fd(&self, epoll: &Epoll) {
+        if let Some(vendor) = &self.vendor {
+            super::flydigi_hid::unregister(vendor, epoll);
+        }
+    }
+
+    /// Drops the vendor reader if its device disappeared.
+    ///
+    /// A hung up hidraw fd stays readable for `epoll`, so it has to be removed from
+    /// the interest list as soon as a read fails; otherwise the event loop would spin.
+    fn cleanup_vendor(&mut self, epoll: &Epoll) {
+        if self.vendor.as_ref().map(|v| v.is_failed()).unwrap_or(false) {
+            self.unregister_fd(epoll);
+            self.vendor = None;
+        }
     }
 
     fn collect_axes_and_buttons(&mut self) {
@@ -725,6 +758,47 @@ impl Gamepad {
         !self.buttons.is_empty() && self.axes.len() >= 2
     }
 
+    /// Attaches the vendor HID reader for devices whose extra buttons are not part
+    /// of the Linux input protocol.
+    ///
+    /// This is a no-op for every controller that [`crate::flydigi::identify`] does not
+    /// know, so unrelated devices are not affected in any way.
+    fn attach_vendor_reader(&mut self, syspath: &Path) {
+        let info = match crate::flydigi::identify(self.vendor_id, self.product_id) {
+            Some(info) => info,
+            None => return,
+        };
+
+        if info.protocol != crate::flydigi::Protocol::V1 {
+            debug!(
+                "{:?} is a Flydigi {:?} device; its vendor protocol is not supported yet",
+                self.devpath, info.model
+            );
+            return;
+        }
+
+        // Capabilities describe which buttons physically exist, so only ask for
+        // those. `BANANASJIM/flydigi-vader5` and SDL both list C/Z + M1-M4 for the
+        // V1 devices.
+        let capabilities = info.capabilities;
+        if !(capabilities.c || capabilities.z || capabilities.m1) {
+            return;
+        }
+
+        let reader = match FlydigiReader::open(syspath, &info, &self.buttons) {
+            Some(reader) => reader,
+            None => return,
+        };
+
+        for code in reader.codes() {
+            if !self.buttons.contains(&code) {
+                self.buttons.push(code);
+            }
+        }
+
+        self.vendor = Some(reader);
+    }
+
     fn find_buttons(key_bits: &[u8], only_gamepad_btns: bool) -> Vec<EvCode> {
         let mut buttons = Vec::with_capacity(16);
 
@@ -787,6 +861,12 @@ impl Gamepad {
     }
 
     fn event(&mut self) -> Option<(EventType, SystemTime)> {
+        // Buttons decoded from a vendor report are produced directly as events; they
+        // are not part of the evdev input_event stream.
+        if let Some(event) = self.vendor.as_mut().and_then(|vendor| vendor.poll()) {
+            return Some(event);
+        }
+
         let mut skip = false;
         // Skip all unknown events and return Option on first know event or when there is no more
         // events to read. Returning None on unknown event breaks iterators.
@@ -896,6 +976,12 @@ impl Gamepad {
         }
 
         for btn in self.buttons.iter().cloned() {
+            if btn.is_vendor() {
+                // Vendor buttons are not part of the kernel key state; their state is
+                // owned by the vendor reader and must survive a resync.
+                continue;
+            }
+
             let val = utils::test_bit(btn.code, &buf);
             if self
                 .buttons_values
@@ -921,6 +1007,7 @@ impl Gamepad {
             }
         }
         self.fd = -2;
+        self.vendor = None;
         self.devpath.clear();
         self.is_connected = false;
     }
@@ -1098,6 +1185,12 @@ impl EvCode {
     pub fn into_u32(self) -> u32 {
         (u32::from(self.kind) << 16) | u32::from(self.code)
     }
+
+    /// `true` if this code was synthesized from a vendor report instead of coming
+    /// from the Linux input protocol.
+    pub(crate) fn is_vendor(self) -> bool {
+        self.kind == EV_VENDOR
+    }
 }
 
 impl From<input_event> for crate::EvCode {
@@ -1118,6 +1211,7 @@ impl Display for EvCode {
             EV_ABS => f.write_str("ABS")?,
             EV_MSC => f.write_str("MSC")?,
             EV_SW => f.write_str("SW")?,
+            EV_VENDOR => f.write_str("VENDOR")?,
             kind => f.write_fmt(format_args!("EV_TYPE_{}", kind))?,
         }
 
@@ -1162,6 +1256,23 @@ const EV_MSC: u16 = 0x04;
 const EV_SW: u16 = 0x05;
 const ABS_MAX: u16 = 0x3f;
 const EV_FF: u16 = 0x15;
+
+/// Pseudo event type used for buttons that are not part of the Linux input
+/// protocol. Real `EV_*` types are `<= EV_MAX` (0x1f), so this value cannot collide
+/// with an event the kernel can produce.
+///
+/// Buttons decoded from a vendor HID report (see [`crate::flydigi`]) are reported
+/// with this `kind` so that they never mix with the evdev state of the device.
+pub const EV_VENDOR: u16 = 0xff00;
+
+// Codes for `EV_VENDOR` buttons. They mirror the bit position of the button in the
+// vendor report so that they are easy to correlate with the protocol documentation.
+// `C` and `Z` reuse the standard `BTN_C`/`BTN_Z` codes, so only `M1`-`M4` need a
+// synthetic code.
+const VENDOR_BTN_M1: u16 = 0x0004;
+const VENDOR_BTN_M2: u16 = 0x0008;
+const VENDOR_BTN_M3: u16 = 0x0010;
+const VENDOR_BTN_M4: u16 = 0x0020;
 
 const SYN_REPORT: u16 = 0x00;
 const SYN_DROPPED: u16 = 0x03;
@@ -1289,6 +1400,26 @@ pub mod native_ev_codes {
     pub const BTN_DPAD_RIGHT: EvCode = EvCode {
         kind: EV_KEY,
         code: super::BTN_DPAD_RIGHT,
+    };
+
+    // Extra macro/back buttons. These have no Linux input event code, so they use the
+    // synthetic `EV_VENDOR` kind and are only ever emitted for devices that have such
+    // buttons (currently only Flydigi controllers, see `crate::flydigi`).
+    pub const BTN_M1: EvCode = EvCode {
+        kind: EV_VENDOR,
+        code: super::VENDOR_BTN_M1,
+    };
+    pub const BTN_M2: EvCode = EvCode {
+        kind: EV_VENDOR,
+        code: super::VENDOR_BTN_M2,
+    };
+    pub const BTN_M3: EvCode = EvCode {
+        kind: EV_VENDOR,
+        code: super::VENDOR_BTN_M3,
+    };
+    pub const BTN_M4: EvCode = EvCode {
+        kind: EV_VENDOR,
+        code: super::VENDOR_BTN_M4,
     };
 
     pub const AXIS_LSTICKX: EvCode = EvCode {

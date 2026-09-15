@@ -28,6 +28,12 @@ pub const BTN_DPAD_DOWN: u16 = 17;
 pub const BTN_DPAD_LEFT: u16 = 18;
 pub const BTN_DPAD_RIGHT: u16 = 19;
 
+// Extra macro/paddle buttons (for example Flydigi Vader `M1`-`M4`).
+pub const BTN_M1: u16 = 20;
+pub const BTN_M2: u16 = 21;
+pub const BTN_M3: u16 = 22;
+pub const BTN_M4: u16 = 23;
+
 pub const AXIS_UNKNOWN: u16 = 0;
 
 pub const AXIS_LSTICKX: u16 = 1;

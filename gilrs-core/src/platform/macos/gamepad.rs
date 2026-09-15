@@ -627,6 +627,27 @@ pub mod native_ev_codes {
         page: super::PAGE_BUTTON,
         usage: super::USAGE_BTN_DPAD_RIGHT,
     };
+
+    // Extra macro/back buttons. macOS does not decode the Flydigi vendor report yet
+    // (see `docs/flydigi.md`), so these are placeholders that only have to be stable
+    // and distinct. They live on the vendor defined page, which the IOKit backend
+    // never treats as a button.
+    pub const BTN_M1: EvCode = EvCode {
+        page: super::PAGE_VENDOR,
+        usage: 0x01,
+    };
+    pub const BTN_M2: EvCode = EvCode {
+        page: super::PAGE_VENDOR,
+        usage: 0x02,
+    };
+    pub const BTN_M3: EvCode = EvCode {
+        page: super::PAGE_VENDOR,
+        usage: 0x03,
+    };
+    pub const BTN_M4: EvCode = EvCode {
+        page: super::PAGE_VENDOR,
+        usage: 0x04,
+    };
 }
 
 type Context = (Sender<(Event, Option<Device>)>, Arc<Mutex<Vec<DeviceInfo>>>);

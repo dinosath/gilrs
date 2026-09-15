@@ -688,7 +688,7 @@ impl Gamepad {
         // If it isn't a Windows "Gamepad" then return what we want SDL mappings to be able to use
         if self.wgi_gamepad.is_none() {
             return match nec.kind {
-                EvCodeKind::Button => None,
+                EvCodeKind::Button | EvCodeKind::Vendor => None,
                 EvCodeKind::Axis => Some(&AxisInfo {
                     min: i16::MIN as i32,
                     max: i16::MAX as i32,
@@ -764,6 +764,9 @@ enum EvCodeKind {
     Button = 0,
     Axis,
     Switch,
+    /// Buttons that do not come from the Windows gamepad APIs, for example the
+    /// extra macro buttons decoded from a vendor HID report.
+    Vendor,
 }
 
 impl Display for EvCodeKind {
@@ -772,6 +775,7 @@ impl Display for EvCodeKind {
             EvCodeKind::Button => "Button",
             EvCodeKind::Axis => "Axis",
             EvCodeKind::Switch => "Switch",
+            EvCodeKind::Vendor => "Vendor",
         }
         .fmt(f)
     }
@@ -930,6 +934,25 @@ pub mod native_ev_codes {
     pub const BTN_DPAD_LEFT: EvCode = EvCode {
         kind: EvCodeKind::Button,
         index: u32::MAX,
+    };
+
+    // Extra macro/back buttons. Windows Gaming Input cannot deliver these, so they
+    // use a dedicated kind and are only produced by a vendor HID reader.
+    pub const BTN_M1: EvCode = EvCode {
+        kind: EvCodeKind::Vendor,
+        index: 0,
+    };
+    pub const BTN_M2: EvCode = EvCode {
+        kind: EvCodeKind::Vendor,
+        index: 1,
+    };
+    pub const BTN_M3: EvCode = EvCode {
+        kind: EvCodeKind::Vendor,
+        index: 2,
+    };
+    pub const BTN_M4: EvCode = EvCode {
+        kind: EvCodeKind::Vendor,
+        index: 3,
     };
 
     pub(super) static BUTTONS: [EvCode; 14] = [

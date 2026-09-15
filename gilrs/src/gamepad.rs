@@ -1009,7 +1009,7 @@ impl GamepadData {
         db: &MappingDb,
     ) -> Self {
         let uuid = Uuid::from_bytes(gamepad.uuid());
-        let mapping = db
+        let mut mapping = db
             .get(uuid)
             .map(
                 |s| match Mapping::parse_sdl_mapping(s, gamepad.buttons(), gamepad.axes()) {
@@ -1027,6 +1027,12 @@ impl GamepadData {
                 warn!("No mapping found for UUID {uuid}\n\tDefault mapping will be used.");
                 Mapping::default(gamepad)
             });
+
+        // Devices that hide buttons from the standard gamepad stack (currently
+        // Flydigi) expose them through additional native codes. Map those to
+        // `Button::C`, `Button::Z` and `Button::M*` on top of whichever base mapping
+        // is in use.
+        mapping.add_extra_buttons(gamepad.buttons());
 
         if gamepad.is_ff_supported() && gamepad.is_connected() {
             if let Some(device) = gamepad.ff_device() {

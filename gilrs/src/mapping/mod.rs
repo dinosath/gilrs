@@ -169,6 +169,49 @@ impl Mapping {
         }
     }
 
+    /// Maps the extra buttons of `gamepad` to `Button::C`, `Button::Z` and
+    /// `Button::M1`-`Button::M4`.
+    ///
+    /// `buttons` is the native button list of the gamepad
+    /// ([`gilrs_core::Gamepad::buttons`]). The vendor macro codes are only present for
+    /// devices that hide buttons from the standard gamepad stack (see
+    /// `gilrs_core::flydigi`), so this cannot affect unrelated controllers: the whole
+    /// function is a no-op unless such a device is detected.
+    ///
+    /// It is applied on top of *every* base mapping, because an SDL mapping from the
+    /// database would otherwise shadow the extra buttons and report them as
+    /// `Button::Unknown`.
+    ///
+    /// Gamepad elements that already have a mapping are left alone, so this never
+    /// overrides a user supplied mapping.
+    pub(crate) fn add_extra_buttons(&mut self, buttons: &[EvCode]) {
+        const MACRO_CODES: [EvCode; 4] = [nec::BTN_M1, nec::BTN_M2, nec::BTN_M3, nec::BTN_M4];
+
+        // Only touch the mapping when the device really has hidden extra buttons.
+        if !MACRO_CODES.iter().any(|code| buttons.contains(code)) {
+            return;
+        }
+
+        for (code, button) in [
+            (nec::BTN_C, Button::C),
+            (nec::BTN_Z, Button::Z),
+            (nec::BTN_M1, Button::M1),
+            (nec::BTN_M2, Button::M2),
+            (nec::BTN_M3, Button::M3),
+            (nec::BTN_M4, Button::M4),
+        ] {
+            if buttons.contains(&code) {
+                self.mappings.entry(code).or_insert(AxisOrBtn::Btn(button));
+            }
+        }
+    }
+
+    /// Returns the button mapped to `code`, if any.
+    #[cfg(test)]
+    fn mapped_to(&self, code: EvCode) -> Option<AxisOrBtn> {
+        self.mappings.get(&code).cloned()
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -222,6 +265,16 @@ impl Mapping {
                     BTN_DPAD_RIGHT => add_button("dpright", ev_code, Button::DPadRight)?,
                     BTN_C => add_button("c", ev_code, Button::C)?,
                     BTN_Z => add_button("z", ev_code, Button::Z)?,
+                    // SDL2 has no dedicated token for the extra macro buttons, so the
+                    // documented paddle tokens are used for the SDL2 representation.
+                    // Note that gilrs deliberately does not map `paddle*` back to
+                    // `Button::M*` when parsing SDL mappings: that would make paddles
+                    // of unrelated controllers (Xbox Elite and friends) show up as
+                    // Flydigi macro buttons.
+                    BTN_M1 => add_button("paddle1", ev_code, Button::M1)?,
+                    BTN_M2 => add_button("paddle2", ev_code, Button::M2)?,
+                    BTN_M3 => add_button("paddle3", ev_code, Button::M3)?,
+                    BTN_M4 => add_button("paddle4", ev_code, Button::M4)?,
                     BTN_UNKNOWN => return Err(MappingError::UnknownElement),
                     _ => unreachable!(),
                 }
@@ -721,5 +774,182 @@ mod tests {
             Some(TEST_STR),
             db.get(Uuid::parse_str("03000000260900008888000000010001").unwrap())
         );
+    }
+
+    #[test]
+    fn extra_buttons_are_mapped_only_when_present() {
+        let buttons = [nec::BTN_SOUTH, nec::BTN_M1, nec::BTN_M3];
+        let mut mapping = Mapping::new();
+        mapping.add_extra_buttons(&buttons);
+
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M1),
+            Some(AxisOrBtn::Btn(Button::M1))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M3),
+            Some(AxisOrBtn::Btn(Button::M3))
+        );
+        assert_eq!(mapping.mapped_to(nec::BTN_M2), None);
+        assert_eq!(mapping.mapped_to(nec::BTN_M4), None);
+    }
+
+    #[test]
+    fn extra_buttons_do_not_override_existing_mappings() {
+        let mut mapping = Mapping::new();
+        mapping
+            .mappings
+            .insert(nec::BTN_M1, AxisOrBtn::Btn(Button::LeftTrigger));
+
+        mapping.add_extra_buttons(&[nec::BTN_M1]);
+
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M1),
+            Some(AxisOrBtn::Btn(Button::LeftTrigger))
+        );
+    }
+
+    /// Regression test: a gamepad that is not a supported Flydigi device must never
+    /// receive `Button::M*` events.
+    #[test]
+    fn unrelated_gamepads_get_no_macro_buttons() {
+        let buttons = [
+            nec::BTN_SOUTH,
+            nec::BTN_EAST,
+            nec::BTN_C,
+            nec::BTN_Z,
+            nec::BTN_NORTH,
+            nec::BTN_WEST,
+            nec::BTN_LT,
+            nec::BTN_RT,
+            nec::BTN_LT2,
+            nec::BTN_RT2,
+            nec::BTN_SELECT,
+            nec::BTN_START,
+            nec::BTN_MODE,
+            nec::BTN_LTHUMB,
+            nec::BTN_RTHUMB,
+            nec::BTN_DPAD_UP,
+        ];
+
+        let mut mapping = Mapping::new();
+        mapping.add_extra_buttons(&buttons);
+
+        for code in [nec::BTN_M1, nec::BTN_M2, nec::BTN_M3, nec::BTN_M4] {
+            assert_eq!(mapping.mapped_to(code), None, "{code} was mapped");
+        }
+
+        // `C`/`Z` must stay unmapped as well: they are only a "hidden" button on a
+        // supported Flydigi device, on a regular 6 button pad they are plain evdev
+        // buttons and the base mapping decides what they mean.
+        assert_eq!(mapping.mapped_to(nec::BTN_C), None);
+        assert_eq!(mapping.mapped_to(nec::BTN_Z), None);
+    }
+
+    /// A supported Flydigi device exposes the vendor macro codes; all of its hidden
+    /// buttons must then be mapped, whichever base mapping is in use.
+    #[test]
+    fn flydigi_extra_buttons_are_mapped_on_top_of_any_mapping() {
+        let buttons = [
+            nec::BTN_SOUTH,
+            nec::BTN_EAST,
+            nec::BTN_C,
+            nec::BTN_Z,
+            nec::BTN_M1,
+            nec::BTN_M2,
+            nec::BTN_M3,
+            nec::BTN_M4,
+        ];
+
+        // Simulate an SDL mapping from the database: it only knows the standard
+        // buttons, so the extra ones have no entry at all.
+        let line = format!("{},Flydigi Vader,a:b0,b:b1,", Uuid::nil().as_simple());
+        let mut mapping = Mapping::parse_sdl_mapping(&line, &buttons, &AXES).unwrap();
+        assert_eq!(mapping.mapped_to(nec::BTN_M1), None);
+
+        mapping.add_extra_buttons(&buttons);
+
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_C),
+            Some(AxisOrBtn::Btn(Button::C))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_Z),
+            Some(AxisOrBtn::Btn(Button::Z))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M1),
+            Some(AxisOrBtn::Btn(Button::M1))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M2),
+            Some(AxisOrBtn::Btn(Button::M2))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M3),
+            Some(AxisOrBtn::Btn(Button::M3))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M4),
+            Some(AxisOrBtn::Btn(Button::M4))
+        );
+    }
+
+    /// Regression test: SDL's `paddle1`-`paddle4` tokens are used for the paddles of
+    /// many controllers (Xbox Elite, GameSir, HORIPAD, ...). They must stay
+    /// `Button::Unknown` so that those controllers do not suddenly report Flydigi
+    /// macro buttons.
+    #[test]
+    fn paddle_tokens_do_not_become_macro_buttons() {
+        let line = format!(
+            "{},Fake Elite,a:b0,b:b1,x:b2,y:b3,leftshoulder:b4,\
+             paddle1:b5,paddle2:b6,paddle3:b7,paddle4:b8,",
+            Uuid::nil().as_simple()
+        );
+
+        let mapping = Mapping::parse_sdl_mapping(&line, &BUTTONS, &AXES).unwrap();
+
+        for code in BUTTONS {
+            if let Some(mapped) = mapping.mapped_to(code) {
+                assert!(
+                    !matches!(
+                        mapped,
+                        AxisOrBtn::Btn(Button::M1 | Button::M2 | Button::M3 | Button::M4)
+                    ),
+                    "{code} was mapped to a macro button"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn from_data_supports_extra_buttons() {
+        let uuid = Uuid::nil();
+        let mut buttons = BUTTONS.to_vec();
+        buttons.extend([nec::BTN_M1, nec::BTN_M2, nec::BTN_M3, nec::BTN_M4]);
+        let axes = AXES.to_vec();
+
+        let mut data = MappingData::new();
+        data.insert_btn(ev::Code(nec::BTN_M1), Button::M1);
+        data.insert_btn(ev::Code(nec::BTN_M4), Button::M4);
+
+        let (mapping, sdl) = Mapping::from_data(&data, &buttons, &axes, "Vader", uuid).unwrap();
+
+        assert!(sdl.contains("paddle1:b"), "{sdl}");
+        assert!(sdl.contains("paddle4:b"), "{sdl}");
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M1),
+            Some(AxisOrBtn::Btn(Button::M1))
+        );
+        assert_eq!(
+            mapping.mapped_to(nec::BTN_M4),
+            Some(AxisOrBtn::Btn(Button::M4))
+        );
+
+        // `set_mapping_strict` rejects `Button::C`/`Button::Z`, but the macro buttons
+        // have a documented SDL representation (`paddle1`-`paddle4`) and are accepted.
+        let mut data = MappingData::new();
+        data.insert_btn(ev::Code(nec::BTN_M1), Button::M1);
+        assert!(Mapping::from_data(&data, &buttons, &axes, "Vader", uuid).is_ok());
     }
 }

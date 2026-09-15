@@ -12,6 +12,8 @@ use std::time::SystemTime;
 mod platform;
 pub mod utils;
 
+pub mod flydigi;
+
 /// True, if Y axis of sticks commonly points downwards.
 pub const IS_Y_AXIS_REVERSED: bool = platform::IS_Y_AXIS_REVERSED;
 
@@ -364,4 +366,14 @@ pub mod native_ev_codes {
     pub const BTN_DPAD_DOWN: EvCode = EvCode(nec::BTN_DPAD_DOWN);
     pub const BTN_DPAD_LEFT: EvCode = EvCode(nec::BTN_DPAD_LEFT);
     pub const BTN_DPAD_RIGHT: EvCode = EvCode(nec::BTN_DPAD_RIGHT);
+
+    /// Extra macro/back button `M1`. Only produced for devices that actually have
+    /// such a button (see [`crate::flydigi`]); other gamepads never report it.
+    pub const BTN_M1: EvCode = EvCode(nec::BTN_M1);
+    /// Extra macro/back button `M2`.
+    pub const BTN_M2: EvCode = EvCode(nec::BTN_M2);
+    /// Extra macro/back button `M3`.
+    pub const BTN_M3: EvCode = EvCode(nec::BTN_M3);
+    /// Extra macro/back button `M4`.
+    pub const BTN_M4: EvCode = EvCode(nec::BTN_M4);
 }

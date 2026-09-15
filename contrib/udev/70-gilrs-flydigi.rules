@@ -1,0 +1,24 @@
+# Access to the Flydigi vendor HID interface, needed for the extra buttons
+# (`C`, `Z`, `M1`-`M4`) that are not part of the Linux input protocol.
+#
+# gilrs reads the raw reports from /dev/hidraw* read-only. Without this rule only
+# root can do that; the controller otherwise keeps working, it just does not report
+# its extra buttons.
+#
+# Install with:
+#   sudo cp 70-gilrs-flydigi.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload
+#   sudo udevadm trigger
+#
+# `TAG+="uaccess"` grants access to the user with the active local session.
+# Use `MODE="0660", GROUP="plugdev"` instead if you prefer group based access.
+
+# Cypress based 2.4 GHz receiver used by the Vader 2/2 Pro/3/3 Pro/4 Pro and the
+# Apex 2/3/4 (V1 protocol). Confirmed by SDL3 (`USB_VENDOR_FLYDIGI_V1`) and
+# `dantmnf/Vader4ProReader`.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="2412", TAG+="uaccess"
+
+# Flydigi's own vendor ID. These devices speak the V2 protocol, which gilrs does not
+# decode yet. The rule is only about permissions and is intentionally kept so that
+# no privileges are missing once V2 support lands.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="37d7", TAG+="uaccess"

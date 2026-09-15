@@ -146,4 +146,9 @@ pub mod native_ev_codes {
     pub const BTN_DPAD_DOWN: EvCode = EvCode(28);
     pub const BTN_DPAD_LEFT: EvCode = EvCode(29);
     pub const BTN_DPAD_RIGHT: EvCode = EvCode(30);
+
+    pub const BTN_M1: EvCode = EvCode(31);
+    pub const BTN_M2: EvCode = EvCode(32);
+    pub const BTN_M3: EvCode = EvCode(33);
+    pub const BTN_M4: EvCode = EvCode(34);
 }

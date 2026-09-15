@@ -308,6 +308,9 @@ fn create_hid_device_matcher(
 pub const PAGE_GENERIC_DESKTOP: u32 = kHIDPage_GenericDesktop;
 pub const PAGE_SIMULATION: u32 = kHIDPage_Simulation;
 pub const PAGE_BUTTON: u32 = kHIDPage_Button;
+/// Vendor defined usage page used by Flydigi controllers (SDL3
+/// `USB_USAGEPAGE_VENDOR_FLYDIGI`).
+pub const PAGE_VENDOR: u32 = 0xffa0;
 
 // GenericDesktop Page (0x01)
 pub const USAGE_AXIS_LSTICKX: u32 = kHIDUsage_GD_X;

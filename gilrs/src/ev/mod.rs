@@ -111,6 +111,7 @@ pub enum EventType {
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
+#[non_exhaustive]
 /// Gamepad's elements which state can be represented by value from 0.0 to 1.0.
 ///
 /// ![Controller layout](https://gilrs-project.gitlab.io/gilrs/img/controller.svg)
@@ -139,6 +140,14 @@ pub enum Button {
     DPadDown = BTN_DPAD_DOWN,
     DPadLeft = BTN_DPAD_LEFT,
     DPadRight = BTN_DPAD_RIGHT,
+    // Extra macro buttons (`M1`-`M4`), for example the four back buttons of a
+    // Flydigi Vader controller. These are separate from all other buttons on
+    // purpose - a physical `M1` is *not* reported as `LeftTrigger` or any other
+    // standard button.
+    M1 = BTN_M1,
+    M2 = BTN_M2,
+    M3 = BTN_M3,
+    M4 = BTN_M4,
 
     #[default]
     Unknown = BTN_UNKNOWN,
@@ -173,6 +182,12 @@ impl Button {
         matches!(self, DPadUp | DPadDown | DPadLeft | DPadRight)
     }
 
+    /// Returns true if button is one of the extra macro/back buttons `M1`-`M4`.
+    pub fn is_macro(self) -> bool {
+        use crate::Button::*;
+        matches!(self, M1 | M2 | M3 | M4)
+    }
+
     pub fn to_nec(self) -> Option<Code> {
         use gilrs_core::native_ev_codes as necs;
 
@@ -196,6 +211,10 @@ impl Button {
             Button::DPadDown => Some(necs::BTN_DPAD_DOWN),
             Button::DPadLeft => Some(necs::BTN_DPAD_LEFT),
             Button::DPadRight => Some(necs::BTN_DPAD_RIGHT),
+            Button::M1 => Some(necs::BTN_M1),
+            Button::M2 => Some(necs::BTN_M2),
+            Button::M3 => Some(necs::BTN_M3),
+            Button::M4 => Some(necs::BTN_M4),
             _ => None,
         }
         .map(Code)
@@ -275,5 +294,85 @@ impl From<Axis> for AxisOrBtn {
 impl From<Button> for AxisOrBtn {
     fn from(value: Button) -> Self {
         Self::Btn(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn macro_buttons_are_distinct() {
+        let macros = [Button::M1, Button::M2, Button::M3, Button::M4];
+        for (i, a) in macros.iter().enumerate() {
+            for b in &macros[i + 1..] {
+                assert_ne!(a, b);
+            }
+        }
+
+        // They must not collide with any other button either.
+        let others = [
+            Button::Unknown,
+            Button::South,
+            Button::East,
+            Button::North,
+            Button::West,
+            Button::C,
+            Button::Z,
+            Button::LeftTrigger,
+            Button::LeftTrigger2,
+            Button::RightTrigger,
+            Button::RightTrigger2,
+            Button::Select,
+            Button::Start,
+            Button::Mode,
+            Button::LeftThumb,
+            Button::RightThumb,
+            Button::DPadUp,
+            Button::DPadDown,
+            Button::DPadLeft,
+            Button::DPadRight,
+        ];
+        for a in macros {
+            for b in others {
+                assert_ne!(a, b, "{a:?} collides with {b:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn macro_button_classification() {
+        for button in [Button::M1, Button::M2, Button::M3, Button::M4] {
+            assert!(button.is_macro());
+            assert!(!button.is_action());
+            assert!(!button.is_trigger());
+            assert!(!button.is_menu());
+            assert!(!button.is_stick());
+            assert!(!button.is_dpad());
+        }
+
+        assert!(!Button::C.is_macro());
+        assert!(!Button::Z.is_macro());
+        assert!(!Button::LeftTrigger.is_macro());
+    }
+
+    #[test]
+    fn macro_buttons_have_native_codes() {
+        use gilrs_core::native_ev_codes as nec;
+        assert_eq!(Button::M1.to_nec(), Some(Code(nec::BTN_M1)));
+        assert_eq!(Button::M2.to_nec(), Some(Code(nec::BTN_M2)));
+        assert_eq!(Button::M3.to_nec(), Some(Code(nec::BTN_M3)));
+        assert_eq!(Button::M4.to_nec(), Some(Code(nec::BTN_M4)));
+    }
+
+    #[test]
+    fn native_macro_codes_are_distinct() {
+        use gilrs_core::native_ev_codes as nec;
+        let codes = [nec::BTN_M1, nec::BTN_M2, nec::BTN_M3, nec::BTN_M4];
+        for (i, a) in codes.iter().enumerate() {
+            for b in &codes[i + 1..] {
+                assert_ne!(a.into_u32(), b.into_u32());
+            }
+        }
     }
 }

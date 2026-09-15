@@ -6,6 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 // Copyright 2016 GilRs Developers
 mod ff;
+mod flydigi_hid;
 mod gamepad;
 mod ioctl;
 mod udev;

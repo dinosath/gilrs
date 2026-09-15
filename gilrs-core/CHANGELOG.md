@@ -1,6 +1,18 @@
 Change Log
 ==========
 
+Unreleased
+----------
+
+### Added
+
+- `flydigi` module: device identification (`detect`), the `V1` vendor report decoder
+  (`protocol_v1`) and the shared `ReportDecoder`/`FlydigiButton` types, all platform
+  independent and unit tested.
+- `native_ev_codes::BTN_M1`-`BTN_M4` on every platform.
+- Linux: the vendor HID reports of supported Flydigi controllers are read from
+  `/dev/hidraw*` and merged into the event stream as `EV_VENDOR` button events.
+
 v0.6.8 - 2026-05-30
 ----------
 

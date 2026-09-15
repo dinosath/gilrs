@@ -3,6 +3,24 @@ Change Log
 
 See also [gilrs-core changelog](../gilrs-core/CHANGELOG.md).
 
+Unreleased
+----------
+
+### Added
+
+- `Button::M1`-`Button::M4` and `Button::is_macro()` for the extra macro/back buttons
+  of controllers that hide them from the standard gamepad APIs.
+- Linux: the extra `C`, `Z` and `M1`-`M4` buttons of supported Flydigi Vader
+  controllers (DInput mode) are now reported as normal gilrs buttons instead of being
+  invisible. See [docs/flydigi.md](../docs/flydigi.md).
+
+### Changed
+
+- `Button` is now `#[non_exhaustive]`. Together with the new variants this is a
+  breaking change for downstream code that matches on `Button` exhaustively, so the
+  next release will be a 0.12. The attribute is there so that adding another vendor
+  button later does not break `match` statements again.
+
 v0.11.2 - 2026-05-30
 ----------
 

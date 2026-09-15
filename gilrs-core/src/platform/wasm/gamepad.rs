@@ -462,6 +462,13 @@ pub mod native_ev_codes {
     pub const BTN_DPAD_LEFT: EvCode = EvCode(29);
     pub const BTN_DPAD_RIGHT: EvCode = EvCode(30);
 
+    // Extra macro/back buttons. The Web Gamepad API cannot expose them, and the high
+    // values keep them clear of `Gamepad::button_code`'s fallback range.
+    pub const BTN_M1: EvCode = EvCode(0xf0);
+    pub const BTN_M2: EvCode = EvCode(0xf1);
+    pub const BTN_M3: EvCode = EvCode(0xf2);
+    pub const BTN_M4: EvCode = EvCode(0xf3);
+
     pub(super) static BUTTONS: [EvCode; 17] = [
         BTN_SOUTH,
         BTN_EAST,

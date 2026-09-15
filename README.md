@@ -111,6 +111,27 @@ Unlike other platforms, events are only generated when you call `Gilrs::next_eve
 
 See [`./gilrs/examples/wasm/README.md`](./gilrs/examples/wasm/README.md) for running the examples using Wasm.
 
+## Vendor specific buttons
+
+Some controllers have buttons that the operating system's gamepad API does not expose.
+gilrs reports the supported ones as regular buttons instead of silently mapping them
+onto an unrelated button.
+
+Currently supported: the extra `C`, `Z` and `M1`-`M4` buttons of Flydigi Vader
+controllers in DInput mode over USB (Linux). See [docs/flydigi.md](docs/flydigi.md) for
+the supported models, the protocol notes and the udev rule that grants access to
+`/dev/hidraw*`.
+
+```rust
+use gilrs::{Button, EventType};
+
+while let Some(ev) = gilrs.next_event() {
+    if let EventType::ButtonPressed(Button::M1, _) = ev.event {
+        println!("M1 pressed");
+    }
+}
+```
+
 License
 =======
 
