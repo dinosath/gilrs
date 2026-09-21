@@ -140,10 +140,10 @@ pub enum Button {
     DPadDown = BTN_DPAD_DOWN,
     DPadLeft = BTN_DPAD_LEFT,
     DPadRight = BTN_DPAD_RIGHT,
-    // Extra macro buttons (`M1`-`M4`), for example the four back buttons of a
-    // Flydigi Vader controller. These are separate from all other buttons on
-    // purpose - a physical `M1` is *not* reported as `LeftTrigger` or any other
-    // standard button.
+    // Extra macro/back buttons (`M1`-`M4`), for example the paddles of an Xbox Elite
+    // or the four back buttons of a Flydigi Vader. These are separate from all other
+    // buttons on purpose - a physical `M1` is *not* reported as `LeftTrigger` or any
+    // other standard button. They correspond to the SDL `paddle1`-`paddle4` tokens.
     M1 = BTN_M1,
     M2 = BTN_M2,
     M3 = BTN_M3,

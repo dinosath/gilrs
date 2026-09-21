@@ -20,9 +20,9 @@ use objc2_io_kit::{
     kHIDUsage_GD_Z, kHIDUsage_Sim_Accelerator, kHIDUsage_Sim_Brake, kHIDUsage_Sim_Rudder,
     kHIDUsage_Sim_Throttle, kIOHIDDeviceUsageKey, kIOHIDDeviceUsagePageKey, kIOHIDLocationIDKey,
     kIOHIDOptionsTypeNone, kIOHIDPrimaryUsageKey, kIOHIDPrimaryUsagePageKey, kIOHIDProductIDKey,
-    kIOHIDProductKey, kIOHIDVendorIDKey, kIOHIDVersionNumberKey, kIOReturnSuccess, IOHIDDevice,
-    IOHIDElement, IOHIDElementType, IOHIDManager, IOObjectRelease, IOObjectRetain,
-    IORegistryEntryGetRegistryEntryID, IO_OBJECT_NULL,
+    kIOHIDProductKey, kIOHIDTransportKey, kIOHIDVendorIDKey, kIOHIDVersionNumberKey,
+    kIOReturnSuccess, IOHIDDevice, IOHIDElement, IOHIDElementType, IOHIDManager, IOObjectRelease,
+    IOObjectRetain, IORegistryEntryGetRegistryEntryID, IO_OBJECT_NULL,
 };
 
 use std::ffi::CStr;
@@ -60,6 +60,12 @@ pub trait DeviceExt: Properties {
     fn get_name(&self) -> Option<String> {
         self.get_string_property(kIOHIDProductKey)
             .map(|name| name.to_string())
+    }
+
+    /// How the device is attached ("USB", "Bluetooth", "SPI", ...).
+    fn get_transport(&self) -> Option<String> {
+        self.get_string_property(kIOHIDTransportKey)
+            .map(|transport| transport.to_string())
     }
 
     fn get_location_id(&self) -> Option<u32> {
@@ -135,6 +141,15 @@ impl Properties for IOHIDDevice {
 
 pub fn element_is_collection(type_: IOHIDElementType) -> bool {
     type_ == IOHIDElementType::Collection
+}
+
+pub fn element_is_input(type_: IOHIDElementType) -> bool {
+    matches!(
+        type_,
+        IOHIDElementType::Input_Misc
+            | IOHIDElementType::Input_Button
+            | IOHIDElementType::Input_Axis
+    )
 }
 
 pub fn element_is_axis(type_: IOHIDElementType, page: u32, usage: u32) -> bool {

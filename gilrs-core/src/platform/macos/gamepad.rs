@@ -254,6 +254,13 @@ impl Gamepad {
             "Unknown".into()
         });
 
+        debug!(
+            "Opening {name} ({:04x}:{:04x}) over {}",
+            device.get_vendor_id().unwrap_or(0),
+            device.get_product_id().unwrap_or(0),
+            device.get_transport().unwrap_or_else(|| "unknown".into())
+        );
+
         let uuid = Self::create_uuid(&device).unwrap_or_default();
 
         let mut gamepad = Gamepad {
@@ -444,9 +451,19 @@ impl Gamepad {
             if element_is_collection(type_) {
                 let children = element_children(element);
                 self.collect_buttons(&children, cookies);
-            } else if element_is_button(type_, page, usage) && !cookies.contains(&cookie) {
-                cookies.push(cookie);
-                self.buttons.push(EvCode::new(page, usage));
+            } else if element_is_button(type_, page, usage) {
+                if !cookies.contains(&cookie) {
+                    cookies.push(cookie);
+                    self.buttons.push(EvCode::new(page, usage));
+                }
+            } else if element_is_input(type_)
+                && !element_is_axis(type_, page, usage)
+                && !element_is_hat(type_, page, usage)
+            {
+                debug!(
+                    "Ignoring input element of {}: page 0x{page:x}, usage 0x{usage:x}",
+                    self.name
+                );
             }
         }
     }
